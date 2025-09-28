@@ -1,0 +1,97 @@
+version: '3.9'
+
+# Baseline (no HA): one Flower server + 5 site clients.
+# Env vars typically injected by your runner (or export them before 'compose up'):
+#   MODEL, ROUNDS, SITES, SEED, MIN_COMPLETION, T_ROUND, OUT_DIR
+# This file assumes 5 sites (A..E). Duplicate/remove site blocks to match your --sites.
+
+services:
+  server:
+    build: ..
+    environment:
+      MODEL: '${MODEL:-m1}'
+      ROUNDS: '${ROUNDS:-50}'
+      MIN_COMPLETION: '${MIN_COMPLETION:-0.7}'
+      T_ROUND: '${T_ROUND:-600}'
+      SEED: '${SEED:-1}'
+      OUT_DIR: '${OUT_DIR:-results}'
+      SERVER_PORT: '8080'
+    command: >
+      sh -c "
+        python -m agg_control.server_flower_noha
+          --model ${MODEL}
+          --rounds ${ROUNDS}
+          --min_completion ${MIN_COMPLETION}
+          --t_round ${T_ROUND}
+          --seed ${SEED}
+          --out ${OUT_DIR}
+          --port ${SERVER_PORT}
+      "
+    ports:
+      - '8080:8080'
+    healthcheck:
+      test: ['CMD-SHELL', 'nc -z localhost 8080 || exit 1']
+      interval: 3s
+      timeout: 2s
+      retries: 30
+
+  siteA: &site
+    build: ..
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      MODEL: '${MODEL:-m1}'
+      SEED: '${SEED:-1}'
+    command: >
+      sh -c "
+        python -m site_client.client_flower
+          --site A
+          --server server:8080
+          --model ${MODEL}
+          --seed ${SEED}
+      "
+
+  siteB:
+    <<: *site
+    command: >
+      sh -c "
+        python -m site_client.client_flower
+          --site B
+          --server server:8080
+          --model ${MODEL}
+          --seed ${SEED}
+      "
+
+  siteC:
+    <<: *site
+    command: >
+      sh -c "
+        python -m site_client.client_flower
+          --site C
+          --server server:8080
+          --model ${MODEL}
+          --seed ${SEED}
+      "
+
+  siteD:
+    <<: *site
+    command: >
+      sh -c "
+        python -m site_client.client_flower
+          --site D
+          --server server:8080
+          --model ${MODEL}
+          --seed ${SEED}
+      "
+
+  siteE:
+    <<: *site
+    command: >
+      sh -c "
+        python -m site_client.client_flower
+          --site E
+          --server server:8080
+          --model ${MODEL}
+          --seed ${SEED}
+      "

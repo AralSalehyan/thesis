@@ -1,0 +1,200 @@
+version: "3.9"
+
+# High-Availability FL stack: KV (Redis), Object Store (MinIO),
+# N=5 aggregator replicas (agg1..agg5), and 5 site clients (siteA..siteE).
+# Environment variables are injected by experiments/run_experiment.py:
+#   MODEL, ROUNDS, SITES, SEED, MIN_COMPLETION, T_ROUND, N, K, OUT_DIR, FAILURES
+#
+# Assumptions:
+# - agg_control/replica.py starts a replica that can become the ephemeral coordinator,
+#   exposes Flower server on :8080 (leader), and participates in k-of-n shard commit.
+# - site_client/client_flower.py connects to the given --server host:port.
+# - Your code reads env vars shown below (or equivalent flags).
+
+services:
+  # --- KV store for fencing tokens (leader epochs) ---
+  redis:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 30
+
+  # --- S3-compatible object storage for shards/checkpoints ---
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9000:9000"  # S3 API
+      - "9001:9001"  # MinIO console
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://minio:9000/minio/health/ready"]
+      interval: 3s
+      timeout: 2s
+      retries: 30
+
+  # --- Aggregator replicas (N=5). Only one acts as coordinator per round ---
+  agg1: &agg
+    build: ..
+    environment:
+      NODE_ID: "agg1"
+      HA: "on"
+      # Control-plane
+      CLUSTER_ID: "seniorcare_fl_DE_2025"
+      KV_URL: "redis://redis:6379"
+      # Data-plane
+      MINIO_URL: "http://minio:9000"
+      MINIO_ACCESS_KEY: "admin"
+      MINIO_SECRET_KEY: "password"
+      # RAID-Fed params
+      N: "${N:-5}"
+      K: "${K:-3}"
+      # Training params (forwarded by run_experiment.py)
+      MODEL: "${MODEL}"
+      ROUNDS: "${ROUNDS}"
+      SITES: "${SITES}"
+      SEED: "${SEED}"
+      MIN_COMPLETION: "${MIN_COMPLETION}"
+      T_ROUND: "${T_ROUND}"
+      OUT_DIR: "${OUT_DIR}"
+      FAILURES: "${FAILURES:-none}"
+    depends_on:
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    # Expose Flower gRPC/HTTP from ONE replica for convenience (ingress)
+    ports:
+      - "8080:8080"
+    command: >
+      sh -c "
+        python -m agg_control.replica
+          --node-id ${NODE_ID}
+          --kv-url ${KV_URL}
+          --minio-url ${MINIO_URL}
+          --minio-access-key ${MINIO_ACCESS_KEY}
+          --minio-secret-key ${MINIO_SECRET_KEY}
+          --cluster-id ${CLUSTER_ID}
+          --n ${N} --k ${K}
+          --model ${MODEL}
+          --rounds ${ROUNDS}
+          --min-completion ${MIN_COMPLETION}
+          --t-round ${T_ROUND}
+          --seed ${SEED}
+          --out ${OUT_DIR}
+      "
+    restart: unless-stopped
+
+  agg2:
+    <<: *agg
+    environment:
+      <<: *{agg.environment}  # (YAML anchors don’t copy nested maps reliably across tools; if this errors in your editor, repeat the env block.)
+      NODE_ID: "agg2"
+    ports: []   # internal only (no host mapping)
+
+  agg3:
+    <<: *agg
+    environment:
+      <<: *{agg.environment}
+      NODE_ID: "agg3"
+    ports: []
+
+  agg4:
+    <<: *agg
+    environment:
+      <<: *{agg.environment}
+      NODE_ID: "agg4"
+    ports: []
+
+  agg5:
+    <<: *agg
+    environment:
+      <<: *{agg.environment}
+      NODE_ID: "agg5"
+    ports: []
+
+  # --- Site clients (A..E). Each talks to agg1:8080 (ingress) ---
+  siteA: &site
+    build: ..
+    depends_on:
+      - agg1
+    environment:
+      MODEL: "${MODEL}"
+      SEED: "${SEED}"
+      SITE_ID: "A"
+    command: >
+      sh -c "
+        python -m site_client.client_flower
+          --site A
+          --server agg1:8080
+          --model ${MODEL}
+          --seed ${SEED}
+      "
+
+  siteB:
+    <<: *site
+    environment:
+      <<: *{site.environment}
+      SITE_ID: "B"
+    command: >
+      sh -c "
+        python -m site_client.client_flower
+          --site B
+          --server agg1:8080
+          --model ${MODEL}
+          --seed ${SEED}
+      "
+
+  siteC:
+    <<: *site
+    environment:
+      <<: *{site.environment}
+      SITE_ID: "C"
+    command: >
+      sh -c "
+        python -m site_client.client_flower
+          --site C
+          --server agg1:8080
+          --model ${MODEL}
+          --seed ${SEED}
+      "
+
+  siteD:
+    <<: *site
+    environment:
+      <<: *{site.environment}
+      SITE_ID: "D"
+    command: >
+      sh -c "
+        python -m site_client.client_flower
+          --site D
+          --server agg1:8080
+          --model ${MODEL}
+          --seed ${SEED}
+      "
+
+  siteE:
+    <<: *site
+    environment:
+      <<: *{site.environment}
+      SITE_ID: "E"
+    command: >
+      sh -c "
+        python -m site_client.client_flower
+          --site E
+          --server agg1:8080
+          --model ${MODEL}
+          --seed ${SEED}
+      "
+
+volumes:
+  minio-data:
