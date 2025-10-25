@@ -41,7 +41,7 @@ import numpy as np
 from minio import Minio
 from reedsolo import RSCodec
 
-from kv import get_kv  # our kv.py
+from .kv import get_kv  # our kv.py
 
 
 # ---------------- MinIO helpers ----------------

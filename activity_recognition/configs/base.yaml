@@ -1,0 +1,7 @@
+server_port: 8080
+n: 5
+k: 3
+min_completion: 0.7
+round_timeout: 600
+
+

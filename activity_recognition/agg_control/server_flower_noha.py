@@ -108,14 +108,33 @@ def main():
 
     ensure_dir(args.out)
 
+    # Simple weighted average aggregator for fit metrics (e.g., loss/acc)
+    def fit_metrics_aggregation_fn(metrics):
+        # Expected: List[Tuple[int, Dict[str, float]]]
+        total = 0
+        sums = {}
+        for num_examples, m in metrics:
+            if not isinstance(m, dict):
+                continue
+            total += int(num_examples)
+            for k, v in m.items():
+                try:
+                    sums[k] = sums.get(k, 0.0) + float(v) * int(num_examples)
+                except Exception:
+                    pass
+        if total <= 0:
+            return {}
+        return {k: (s / total) for k, s in sums.items()}
+
     # Create strategy; you can tune these fractions or set min_* clients if you like
     strategy = LoggingFedAvg(
         out_dir=args.out,
         model_name=args.model,
         fraction_fit=1.0,          # cross-silo default
         fraction_evaluate=0.0,     # optional
-        min_fit_clients=None,
-        min_available_clients=None,
+        min_fit_clients=1,
+        min_available_clients=1,
+        fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
     )
 
     cfg = ServerConfig(num_rounds=args.rounds, round_timeout=args.t_round)

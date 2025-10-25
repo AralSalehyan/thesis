@@ -1,0 +1,38 @@
+version: '3.9'
+
+# Minimal demo stack: Redis (control plane) and MinIO (object store)
+# Use with experiments/ha_demo.py to showcase PREPARE/ACK/COMMIT and k-of-n recovery.
+
+services:
+  redis:
+    image: redis:7
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 3s
+      timeout: 2s
+      retries: 30
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password
+    volumes:
+      - minio-demo-data:/data
+    ports:
+      - '9000:9000' # S3 API
+      - '9001:9001' # MinIO console
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://minio:9000/minio/health/ready']
+      interval: 3s
+      timeout: 2s
+      retries: 30
+
+volumes:
+  minio-demo-data:
+
+

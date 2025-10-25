@@ -159,7 +159,25 @@ class RaidFedStrategy(FedAvg):
         t_round: int,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        # Provide a simple weighted aggregation for client fit metrics
+        def fit_metrics_aggregation_fn(metrics):
+            total = 0
+            sums = {}
+            for num_examples, m in metrics:
+                if not isinstance(m, dict):
+                    continue
+                ne = int(num_examples)
+                total += ne
+                for k2, v in m.items():
+                    try:
+                        sums[k2] = sums.get(k2, 0.0) + float(v) * ne
+                    except Exception:
+                        pass
+            if total <= 0:
+                return {}
+            return {k2: (s / total) for k2, s in sums.items()}
+
+        super().__init__(fit_metrics_aggregation_fn=fit_metrics_aggregation_fn, **kwargs)
         self.n = n
         self.k = k
         self.kv = kv
@@ -183,7 +201,7 @@ class RaidFedStrategy(FedAvg):
         if agg is None:
             return None
 
-        parameters, _ = agg
+        parameters, metrics_agg = agg
         weights = parameters_to_ndarrays(parameters)
         blob = serialize_ndarrays(weights)
         model_hash = hash_bytes(blob)
@@ -200,6 +218,7 @@ class RaidFedStrategy(FedAvg):
             "k": self.k,
             "model_hash": model_hash,
             "shard_keys": [],
+            "metrics": metrics_agg if isinstance(metrics_agg, dict) else {},
         }
         for idx, shard in enumerate(shards):
             bucket = f"raidfed-shard-{idx+1:02d}"
@@ -215,6 +234,7 @@ class RaidFedStrategy(FedAvg):
         # Publish PREPARE (with fencing token included for clarity)
         token = self.kv.incr(f"fencing:{self.cluster_id}")
         prepare_record = {
+            "round": server_round,
             "token": token,
             "meta": meta,
             "ts": time.time(),
@@ -243,12 +263,15 @@ class RaidFedStrategy(FedAvg):
 
         # COMMIT
         commit_record = {
+            "round": server_round,
             "token": token,
             "meta": meta,
             "ts": time.time(),
             "coordinator": self.node_id,
         }
         self.kv.set(commit_key, json.dumps(commit_record))
+        # Also update last committed round for followers' target calculation
+        self.kv.set(f"last_commit_round:{self.cluster_id}", int(server_round))
 
         # Optionally dump a human-readable meta file for the run
         with open(os.path.join(self.out_dir, f"round_{server_round:04d}_meta.json"), "w") as f:
@@ -298,8 +321,8 @@ def main():
         out_dir=args.out,
         min_completion=args.min_completion,
         t_round=args.t_round,
-        min_fit_clients=None,          # use FedAvg defaults or set explicitly
-        min_available_clients=None,
+        min_fit_clients=1,
+        min_available_clients=1,
         fraction_fit=1.0,              # cross-silo: usually 1.0 or per round cohort
         fraction_evaluate=0.0,         # optional
     )

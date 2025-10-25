@@ -49,23 +49,23 @@ services:
       NODE_ID: "agg1"
       HA: "on"
       # Control-plane
-      CLUSTER_ID: "seniorcare_fl_DE_2025"
-      KV_URL: "redis://redis:6379"
+      CLUSTER_ID: "${CLUSTER_ID:-seniorcare_fl_DE_2025}"
+      KV_URL: "${KV_URL:-redis://redis:6379}"
       # Data-plane
-      MINIO_URL: "http://minio:9000"
-      MINIO_ACCESS_KEY: "admin"
-      MINIO_SECRET_KEY: "password"
+      MINIO_URL: "${MINIO_URL:-http://minio:9000}"
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-admin}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-password}"
       # RAID-Fed params
       N: "${N:-5}"
       K: "${K:-3}"
       # Training params (forwarded by run_experiment.py)
-      MODEL: "${MODEL}"
-      ROUNDS: "${ROUNDS}"
-      SITES: "${SITES}"
-      SEED: "${SEED}"
-      MIN_COMPLETION: "${MIN_COMPLETION}"
-      T_ROUND: "${T_ROUND}"
-      OUT_DIR: "${OUT_DIR}"
+      MODEL: "${MODEL:-m1}"
+      ROUNDS: "${ROUNDS:-3}"
+      SITES: "${SITES:-5}"
+      SEED: "${SEED:-1}"
+      MIN_COMPLETION: "${MIN_COMPLETION:-0.7}"
+      T_ROUND: "${T_ROUND:-600}"
+      OUT_DIR: "${OUT_DIR:-results}"
       FAILURES: "${FAILURES:-none}"
     depends_on:
       redis:
@@ -77,124 +77,163 @@ services:
       - "8080:8080"
     command: >
       sh -c "
-        python -m agg_control.replica
-          --node-id ${NODE_ID}
-          --kv-url ${KV_URL}
-          --minio-url ${MINIO_URL}
-          --minio-access-key ${MINIO_ACCESS_KEY}
-          --minio-secret-key ${MINIO_SECRET_KEY}
-          --cluster-id ${CLUSTER_ID}
-          --n ${N} --k ${K}
-          --model ${MODEL}
-          --rounds ${ROUNDS}
-          --min-completion ${MIN_COMPLETION}
-          --t-round ${T_ROUND}
-          --seed ${SEED}
-          --out ${OUT_DIR}
+        python -m agg_control.server_flower_ha
       "
     restart: unless-stopped
 
   agg2:
     <<: *agg
     environment:
-      <<: *{agg.environment}  # (YAML anchors don’t copy nested maps reliably across tools; if this errors in your editor, repeat the env block.)
       NODE_ID: "agg2"
+      HA: "on"
+      CLUSTER_ID: "${CLUSTER_ID:-seniorcare_fl_DE_2025}"
+      KV_URL: "${KV_URL:-redis://redis:6379}"
+      MINIO_URL: "${MINIO_URL:-http://minio:9000}"
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-admin}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-password}"
+      N: "${N:-5}"
+      K: "${K:-3}"
+      MODEL: "${MODEL:-m1}"
+      ROUNDS: "${ROUNDS:-3}"
+      SITES: "${SITES:-5}"
+      SEED: "${SEED:-1}"
+      MIN_COMPLETION: "${MIN_COMPLETION:-0.7}"
+      T_ROUND: "${T_ROUND:-600}"
+      OUT_DIR: "${OUT_DIR:-results}"
+      FAILURES: "${FAILURES:-none}"
     ports: []   # internal only (no host mapping)
+    command: >
+      sh -c "python -m agg_control.replica --node-id agg2 --cluster-id ${CLUSTER_ID:-seniorcare_fl_DE_2025} --kv-url ${KV_URL:-redis://redis:6379/0} --minio-url ${MINIO_URL:-http://minio:9000} --minio-access-key ${MINIO_ACCESS_KEY:-admin} --minio-secret-key ${MINIO_SECRET_KEY:-password}"
 
   agg3:
     <<: *agg
     environment:
-      <<: *{agg.environment}
       NODE_ID: "agg3"
+      HA: "on"
+      CLUSTER_ID: "${CLUSTER_ID:-seniorcare_fl_DE_2025}"
+      KV_URL: "${KV_URL:-redis://redis:6379}"
+      MINIO_URL: "${MINIO_URL:-http://minio:9000}"
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-admin}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-password}"
+      N: "${N:-5}"
+      K: "${K:-3}"
+      MODEL: "${MODEL:-m1}"
+      ROUNDS: "${ROUNDS:-3}"
+      SITES: "${SITES:-5}"
+      SEED: "${SEED:-1}"
+      MIN_COMPLETION: "${MIN_COMPLETION:-0.7}"
+      T_ROUND: "${T_ROUND:-600}"
+      OUT_DIR: "${OUT_DIR:-results}"
+      FAILURES: "${FAILURES:-none}"
     ports: []
+    command: >
+      sh -c "python -m agg_control.replica --node-id agg3 --cluster-id ${CLUSTER_ID:-seniorcare_fl_DE_2025} --kv-url ${KV_URL:-redis://redis:6379/0} --minio-url ${MINIO_URL:-http://minio:9000} --minio-access-key ${MINIO_ACCESS_KEY:-admin} --minio-secret-key ${MINIO_SECRET_KEY:-password}"
 
   agg4:
     <<: *agg
     environment:
-      <<: *{agg.environment}
       NODE_ID: "agg4"
+      HA: "on"
+      CLUSTER_ID: "${CLUSTER_ID:-seniorcare_fl_DE_2025}"
+      KV_URL: "${KV_URL:-redis://redis:6379}"
+      MINIO_URL: "${MINIO_URL:-http://minio:9000}"
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-admin}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-password}"
+      N: "${N:-5}"
+      K: "${K:-3}"
+      MODEL: "${MODEL:-m1}"
+      ROUNDS: "${ROUNDS:-3}"
+      SITES: "${SITES:-5}"
+      SEED: "${SEED:-1}"
+      MIN_COMPLETION: "${MIN_COMPLETION:-0.7}"
+      T_ROUND: "${T_ROUND:-600}"
+      OUT_DIR: "${OUT_DIR:-results}"
+      FAILURES: "${FAILURES:-none}"
     ports: []
+    command: >
+      sh -c "python -m agg_control.replica --node-id agg4 --cluster-id ${CLUSTER_ID:-seniorcare_fl_DE_2025} --kv-url ${KV_URL:-redis://redis:6379/0} --minio-url ${MINIO_URL:-http://minio:9000} --minio-access-key ${MINIO_ACCESS_KEY:-admin} --minio-secret-key ${MINIO_SECRET_KEY:-password}"
 
   agg5:
     <<: *agg
     environment:
-      <<: *{agg.environment}
       NODE_ID: "agg5"
+      HA: "on"
+      CLUSTER_ID: "${CLUSTER_ID:-seniorcare_fl_DE_2025}"
+      KV_URL: "${KV_URL:-redis://redis:6379}"
+      MINIO_URL: "${MINIO_URL:-http://minio:9000}"
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-admin}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-password}"
+      N: "${N:-5}"
+      K: "${K:-3}"
+      MODEL: "${MODEL:-m1}"
+      ROUNDS: "${ROUNDS:-3}"
+      SITES: "${SITES:-5}"
+      SEED: "${SEED:-1}"
+      MIN_COMPLETION: "${MIN_COMPLETION:-0.7}"
+      T_ROUND: "${T_ROUND:-600}"
+      OUT_DIR: "${OUT_DIR:-results}"
+      FAILURES: "${FAILURES:-none}"
     ports: []
+    command: >
+      sh -c "python -m agg_control.replica --node-id agg5 --cluster-id ${CLUSTER_ID:-seniorcare_fl_DE_2025} --kv-url ${KV_URL:-redis://redis:6379/0} --minio-url ${MINIO_URL:-http://minio:9000} --minio-access-key ${MINIO_ACCESS_KEY:-admin} --minio-secret-key ${MINIO_SECRET_KEY:-password}"
 
   # --- Site clients (A..E). Each talks to agg1:8080 (ingress) ---
-  siteA: &site
+  sitea: &site
     build: ..
     depends_on:
       - agg1
     environment:
-      MODEL: "${MODEL}"
-      SEED: "${SEED}"
+      MODEL: "${MODEL:-m1}"
+      SEED: "${SEED:-1}"
       SITE_ID: "A"
+    volumes:
+      - ../data:/app/data:ro
     command: >
-      sh -c "
-        python -m site_client.client_flower
-          --site A
-          --server agg1:8080
-          --model ${MODEL}
-          --seed ${SEED}
-      "
+      sh -c "python -m site_client.client_flower --site A --server agg1:8080 --model $MODEL --seed $SEED"
 
-  siteB:
+  siteb:
     <<: *site
     environment:
-      <<: *{site.environment}
+      MODEL: "${MODEL:-m1}"
+      SEED: "${SEED:-1}"
       SITE_ID: "B"
+    volumes:
+      - ../data:/app/data:ro
     command: >
-      sh -c "
-        python -m site_client.client_flower
-          --site B
-          --server agg1:8080
-          --model ${MODEL}
-          --seed ${SEED}
-      "
+      sh -c "python -m site_client.client_flower --site B --server agg1:8080 --model $MODEL --seed $SEED"
 
-  siteC:
+  sitec:
     <<: *site
     environment:
-      <<: *{site.environment}
+      MODEL: "${MODEL:-m1}"
+      SEED: "${SEED:-1}"
       SITE_ID: "C"
+    volumes:
+      - ../data:/app/data:ro
     command: >
-      sh -c "
-        python -m site_client.client_flower
-          --site C
-          --server agg1:8080
-          --model ${MODEL}
-          --seed ${SEED}
-      "
+      sh -c "python -m site_client.client_flower --site C --server agg1:8080 --model $MODEL --seed $SEED"
 
-  siteD:
+  sited:
     <<: *site
     environment:
-      <<: *{site.environment}
+      MODEL: "${MODEL:-m1}"
+      SEED: "${SEED:-1}"
       SITE_ID: "D"
+    volumes:
+      - ../data:/app/data:ro
     command: >
-      sh -c "
-        python -m site_client.client_flower
-          --site D
-          --server agg1:8080
-          --model ${MODEL}
-          --seed ${SEED}
-      "
+      sh -c "python -m site_client.client_flower --site D --server agg1:8080 --model $MODEL --seed $SEED"
 
-  siteE:
+  sitee:
     <<: *site
     environment:
-      <<: *{site.environment}
+      MODEL: "${MODEL:-m1}"
+      SEED: "${SEED:-1}"
       SITE_ID: "E"
+    volumes:
+      - ../data:/app/data:ro
     command: >
-      sh -c "
-        python -m site_client.client_flower
-          --site E
-          --server agg1:8080
-          --model ${MODEL}
-          --seed ${SEED}
-      "
+      sh -c "python -m site_client.client_flower --site E --server agg1:8080 --model $MODEL --seed $SEED"
 
 volumes:
   minio-data:
